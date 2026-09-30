@@ -9,9 +9,13 @@ and grab hearts before the next wave starts.
 
 ## Screenshots
 
-| Title | In the arena | Game over |
+| Title | Deduction | Game over |
 | --- | --- | --- |
-| ![Title screen](screenshots/title.png) | ![Arena fight](screenshots/fight.png) | ![Game over](screenshots/over.png) |
+| ![Title screen](screenshots/title.png) | ![Deduction](screenshots/fight.png) | ![Game over](screenshots/over.png) |
+
+| Kiln | Veil |
+| --- | --- |
+| ![Kiln](screenshots/kiln.png) | ![Veil](screenshots/veil.png) |
 
 ## Features
 
