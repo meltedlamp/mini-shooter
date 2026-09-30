@@ -97,13 +97,23 @@ def draw_heart(surf, x, y, filled, scale=1.0):
 
 
 class Bullet:
-    def __init__(self, pos, vel, friendly):
+    def __init__(self, pos, vel, friendly, damage=1, pierce=0, radius=None, color=None):
         self.pos = pygame.Vector2(pos)
         self.vel = pygame.Vector2(vel)
         self.friendly = friendly
-        self.radius = 4 if friendly else 5
+        self.damage = damage
+        self.pierce = pierce
+        self.hit_ids = set()
+        self.radius = 5 if radius is None and not friendly else (4 if radius is None else radius)
         self.life = 1.15
         self.trail = []
+        if color is not None:
+            self.color = color
+        elif friendly:
+            self.color = (170, 245, 255)
+        else:
+            self.color = (255, 120, 90)
+        self.hot = (255, 255, 255) if friendly else (255, 220, 170)
 
     def advance(self, dt, steps):
         self.life -= dt
@@ -118,16 +128,14 @@ class Bullet:
         return hit_points
 
     def draw(self, surf):
-        color = (170, 245, 255) if self.friendly else (255, 120, 90)
-        hot = (255, 255, 255) if self.friendly else (255, 220, 170)
         for i, point in enumerate(self.trail):
             fade = (i + 1) / max(1, len(self.trail))
-            pygame.draw.circle(surf, color, point, max(1, int(2 * fade)))
+            pygame.draw.circle(surf, self.color, point, max(1, int(2 * fade)))
         if self.vel.length_squared() > 1:
             direction = self.vel.normalize()
             tail = self.pos - direction * (14 if self.friendly else 11)
-            pygame.draw.line(surf, color, tail, self.pos, 3)
-        pygame.draw.circle(surf, hot, self.pos, self.radius)
+            pygame.draw.line(surf, self.color, tail, self.pos, max(3, int(self.radius * 0.7)))
+        pygame.draw.circle(surf, self.hot, self.pos, max(1, int(round(self.radius))))
 
 
 class Heart:
@@ -165,6 +173,7 @@ class Player:
         self.iframe = 0.0
         self.alive = True
         self.radius = PLAYER_RADIUS
+        self.gun_color = (48, 54, 68)
 
     def face(self, aim, dt):
         if aim.length_squared() < 4:
@@ -173,7 +182,9 @@ class Player:
         self.angle = turn_toward(self.angle, math.atan2(direction.y, direction.x), dt, 16)
         return pygame.Vector2(math.cos(self.angle), math.sin(self.angle))
 
-    def update(self, dt, move, aim, want_fire, want_dash):
+    def update(self, dt, move, aim, want_fire, want_dash, fire_cooldown=FIRE_COOLDOWN,
+               bullet_speed=PLAYER_BULLET_SPEED, bullet_damage=1, bullet_pierce=0,
+               bullet_radius=4, bullet_color=(170, 245, 255), move_scale=1.0):
         """Move, dash and maybe shoot. Returns (bullet, casing_velocity) or (None, None)."""
         self.lived += dt
         self.fire_cd = max(0.0, self.fire_cd - dt)
@@ -193,7 +204,7 @@ class Player:
         else:
             if move.length_squared() > 0:
                 move = move.normalize()
-            desired = move * PLAYER_SPEED
+            desired = move * PLAYER_SPEED * move_scale
             self.vel += (desired - self.vel) * min(1.0, 12 * dt)
             if want_dash and self.dash_cd <= 0 and (move.length_squared() > 0 or facing.length_squared() > 0):
                 self.dash_dir = move if move.length_squared() > 0 else facing
@@ -213,13 +224,16 @@ class Player:
 
         if not want_fire or self.fire_cd > 0 or self.dash_t > 0:
             return None, None
-        self.fire_cd = FIRE_COOLDOWN
+        self.fire_cd = fire_cooldown
         self.recoil = 1.0
         self.flash = 1.0
         self.vel -= facing * 28
         origin = self.pos + facing * 28
         side = pygame.Vector2(-facing.y, facing.x)
-        bullet = Bullet(origin, facing * PLAYER_BULLET_SPEED, True)
+        bullet = Bullet(
+            origin, facing * bullet_speed, True,
+            damage=bullet_damage, pierce=bullet_pierce, radius=bullet_radius, color=bullet_color,
+        )
         return bullet, (origin + side * 6, side * 120 - facing * 30)
 
     def draw(self, surf, ghost=None, fade=1.0):
@@ -254,7 +268,8 @@ class Player:
         gun = world_points(origin, angle, (
             (8, -3.2), (24 - kick, -2.2), (24 - kick, 2.2), (8, 3.2),
         ))
-        pygame.draw.polygon(surf, tuple(int(c * fade) for c in (48, 54, 68)), gun)
+        gun_rgb = self.gun_color if ghost is None else (48, 54, 68)
+        pygame.draw.polygon(surf, tuple(int(c * fade) for c in gun_rgb), gun)
         grip = world_points(origin, angle, ((6, 1), (11, 1), (11, 6), (6, 6)))
         pygame.draw.polygon(surf, tuple(int(c * fade) for c in (36, 40, 52)), grip)
         if flash > 0.05 and ghost is None:
@@ -269,6 +284,7 @@ STATS = {
     "grunt": {"hp": 2, "speed": 108, "radius": 16, "score": 10, "color": (255, 148, 70)},
     "shooter": {"hp": 3, "speed": 80, "radius": 15, "score": 25, "color": (186, 126, 255)},
     "brute": {"hp": 8, "speed": 64, "radius": 26, "score": 60, "color": (255, 82, 104)},
+    "secret": {"hp": 20, "speed": 72, "radius": 32, "score": 180, "color": (140, 186, 220)},
 }
 
 
@@ -297,6 +313,8 @@ class Enemy:
         self.mode = "chase"
         self.mode_t = 0.0
         self.charge_dir = pygame.Vector2(1, 0)
+        self.secret_cd = random.uniform(0.6, 1.2)
+        self.name = ""
 
     def _toward_player(self, player):
         delta = player.pos - self.pos
@@ -322,7 +340,9 @@ class Enemy:
         side = pygame.Vector2(-direction.y, direction.x) * self.strafe
         shot = None
 
-        if self.kind == "brute":
+        if self.kind == "secret":
+            desired, shot = self._secret(dt, direction, dist)
+        elif self.kind == "brute":
             desired, shot = self._brute(dt, direction, dist)
         elif self.kind == "shooter":
             desired, shot = self._shooter(dt, player, crates, direction, dist, side)
@@ -381,6 +401,21 @@ class Enemy:
             shot = Bullet(origin, facing * ENEMY_BULLET_SPEED, False)
         return move * self.speed, shot
 
+    def _secret(self, dt, direction, dist):
+        desired, _shot = self._brute(dt, direction, dist)
+        shots = []
+        if self.mode == "chase" and self.spawn <= 0 and dist < 700:
+            self.secret_cd -= dt
+            if self.secret_cd <= 0:
+                self.secret_cd = 1.7
+                base = math.atan2(direction.y, direction.x)
+                for spread in (-0.4, 0.0, 0.4):
+                    angle = base + spread
+                    facing = pygame.Vector2(math.cos(angle), math.sin(angle))
+                    origin = self.pos + facing * (self.radius + 10)
+                    shots.append(Bullet(origin, facing * (ENEMY_BULLET_SPEED * 0.85), False, color=self.color))
+        return desired, shots or None
+
     def draw(self, surf):
         scale = 1.0
         if self.spawn > 0 and self.alive:
@@ -398,6 +433,9 @@ class Enemy:
         dark = tuple(max(0, c - 50) for c in self.color)
         pygame.draw.ellipse(surf, dark, body.inflate(6 * scale, 6 * scale))
         pygame.draw.ellipse(surf, color, body)
+        if self.kind == "secret" and self.alive and scale > 0.5:
+            pygame.draw.circle(surf, color, origin, int(self.radius * scale + 12), 3)
+            pygame.draw.circle(surf, dark, origin, max(4, int(self.radius * scale * 0.42)))
         if self.kind == "brute" and self.alive and scale > 0.55:
             pygame.draw.ellipse(surf, dark, body.inflate(-10 * scale, -8 * scale), max(1, int(3 * scale)))
         if self.kind == "shooter":

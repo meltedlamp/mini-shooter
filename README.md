@@ -16,6 +16,10 @@ and grab hearts before the next wave starts.
 ## Features
 
 - **Aim and shoot**: the gun tracks the cursor, kicks back, and throws a muzzle flash. Bullets leave a short trail.
+- **Three maps**, picked on the title screen. **Deduction** is the open crate floor. **Kiln** has lava pools that burn if you stand in them, and tougher waves. **Veil** has mist that slows your steps, and more shooters. The side panel and buttons take on that map's colors.
+- **Secret bosses** sleep in all four corners of every map. Walk into a corner and one wakes up. Beating it pays a big score and a free weapon upgrade. They do not appear on the map until they wake.
+- **A bigger map**: the arena is larger than the window. The view follows you, and the map on the right shows the whole floor, the crates, the enemies, and your dot moving through it.
+- **Weapon upgrades**: every 100 points the fight pauses and you pick one boost. Rapid shoots faster, Spread fires a fan, Heavy hits harder, and Pierce lets shots pass through enemies. Each can be taken up to three times.
 - **Dash**: Shift bursts you across the floor and leaves afterimages. You slip through enemy shots while dashing.
 - **Three enemies**: orange grunts that chase, purple shooters that hang back and fire, and big red brutes that telegraph a charge with a line, then rush.
 - **Cover**: wooden crates stop you and stop bullets. A brute that charges into one slams to a halt.
@@ -45,6 +49,7 @@ python game.py
 | Aim | Mouse |
 | Shoot | Hold the left mouse button |
 | Dash | `Shift` |
+| Pick an upgrade | Click a card, or press `1` `2` `3` |
 | Start / play again | Click **Play** or **Again** (or press `Enter` or `Space`) |
 | Pause | `Esc`, then **Resume** or **Title** |
 | Mute / unmute | `M` |
@@ -52,7 +57,9 @@ python game.py
 
 ## How to play
 
-- Clear every enemy in the wave. A banner announces the next one, and you get a moment to move before they spawn at the edges.
+- The floor is bigger than the screen. Walk and the view follows. Use the map on the right to see enemies coming and where the crates are.
+- Every 100 points, pick a weapon upgrade before the fight continues. The bar on the side shows how close the next one is.
+- Clear every enemy in the wave. A banner announces the next one, and you get a moment to move before they spawn nearby.
 - Grunts walk straight at you. Two shots stop one. Touching an enemy costs a heart.
 - Shooters keep their distance and fire slow orange shots. Crates block those shots, so step behind one instead of eating the bullet.
 - A brute pauses, draws a line toward you, then charges faster than you can run. Sidestep or dash. It takes a lot of shots, shakes the screen when it goes down, and drops a heart.
