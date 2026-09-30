@@ -11,7 +11,7 @@ from .actors import (
 from .audio import Audio
 from .fx import Floater, Particle, burst, ring
 from .maps import MAPS
-from .scores import read_high_score, write_high_score
+from .scores import read_high_score, read_map_open, write_high_score, write_map_open
 from .settings import (
     AMBER, CYAN, DASH_COOLDOWN, FIRE_COOLDOWN, FPS, GOLD, HEIGHT, INK, MARGIN, MAX_HEARTS, MUTED,
     PANEL_W, PLAYER_BULLET_SPEED, TEXT, TITLE, UPGRADE_EVERY, VIEW_H, VIEW_W, WALL, WIDTH, WORLD_H,
@@ -36,11 +36,8 @@ class Game:
             pass
         pygame.init()
         pygame.display.set_caption(TITLE)
-        if headless:
-            self.screen = pygame.Surface((WIDTH, HEIGHT))
-        else:
-            self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-            pygame.mouse.set_visible(False)
+        self.map_open = read_map_open(default=False)
+        self.apply_window()
         self.world = pygame.Surface((WORLD_W, WORLD_H))
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont("segoeui", 28)
@@ -89,7 +86,6 @@ class Game:
         self.wave = 1
         self.banner = 1.2
         self.score = 0
-        self.score_saved = False
         self.new_best = False
         self.shake = 0.0
         self.hitstop = 0.0
@@ -106,6 +102,7 @@ class Game:
             self.clicked = False
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
+                    self.remember_score()
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
                     self.on_key(event.key)
@@ -121,6 +118,9 @@ class Game:
         if key == pygame.K_m:
             self.audio.toggle()
             return
+        if key == pygame.K_TAB:
+            self.toggle_map()
+            return
         if self.state == "upgrade" and key in (pygame.K_1, pygame.K_2, pygame.K_3, pygame.K_KP1, pygame.K_KP2, pygame.K_KP3):
             picked = {pygame.K_1: 0, pygame.K_KP1: 0, pygame.K_2: 1, pygame.K_KP2: 1, pygame.K_3: 2, pygame.K_KP3: 2}
             self.choose_upgrade(picked[key])
@@ -134,7 +134,7 @@ class Game:
                 self.state = "play"
                 self.player.fire_cd = 0.15
             elif self.state == "over":
-                self.state = "start"
+                self.show_title()
         elif key in (pygame.K_RETURN, pygame.K_SPACE) and self.state in ("start", "over"):
             self.begin()
 
@@ -142,6 +142,12 @@ class Game:
         self.reset_run()
         self.apply_map()
         self.state = "play"
+        self.audio.set_bed(self.theme["id"])
+
+    def show_title(self):
+        self.remember_score()
+        self.state = "start"
+        self.audio.set_bed(None)
 
     def apply_map(self):
         self.theme = MAPS[self.map_index]
@@ -169,6 +175,9 @@ class Game:
         return (math.cos(angle) * self.shake, math.sin(angle) * self.shake)
 
     def update(self, dt):
+        if self.clicked and self.map_toggle_rect().collidepoint(pygame.mouse.get_pos()):
+            self.toggle_map()
+            self.clicked = False
         if self.state == "start":
             self.update_title(dt)
         elif self.state == "play":
@@ -199,7 +208,12 @@ class Game:
             float((keys[pygame.K_s] or keys[pygame.K_DOWN]) - (keys[pygame.K_w] or keys[pygame.K_UP])),
         )
         mouse = self.mouse_world()
-        want_fire = pygame.mouse.get_pressed()[0]
+        pointer = pygame.mouse.get_pos()
+        want_fire = (
+            pygame.mouse.get_pressed()[0]
+            and pointer[0] < VIEW_W
+            and not self.map_toggle_rect().collidepoint(pointer)
+        )
         want_dash = keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]
         if self.player.alive:
             self.sync_gun()
@@ -239,6 +253,7 @@ class Game:
         self.update_fx(dt)
         if not self.player.alive and self.death_t <= 0:
             self.state = "over"
+            self.audio.set_bed(None)
         else:
             self.maybe_open_upgrade()
 
@@ -478,21 +493,24 @@ class Game:
             ring(self.particles, self.player.pos, (255, 255, 255), 18)
             self.shake = 12
             self.audio.play("boom")
-            self.commit_score()
+            self.remember_score()
         else:
             self.audio.play("hurt")
 
-    def commit_score(self):
-        if self.score_saved:
-            return
-        self.score_saved = True
+    def remember_score(self):
         if self.score > self.high:
             self.high = self.score
-            write_high_score(self.high)
             self.new_best = True
+        if not self.new_best:
+            return
+        try:
+            write_high_score(self.high)
+        except OSError:
+            pass
 
     def add_score(self, amount):
         self.score += amount
+        self.remember_score()
         while self.score >= self.upgrade_at:
             self.pending_upgrades += 1
             self.upgrade_at += UPGRADE_EVERY
@@ -630,13 +648,15 @@ class Game:
             if self.banner > 0 and self.state == "play":
                 self.draw_banner()
             self.draw_hud()
-            self.draw_panel()
+            if self.map_open:
+                self.draw_panel()
             if self.state == "pause":
                 self.draw_pause()
             elif self.state == "over":
                 self.draw_over()
             elif self.state == "upgrade":
                 self.draw_upgrade()
+            self.draw_map_toggle()
         self.draw_crosshair()
         if not self.headless:
             pygame.display.flip()
@@ -719,6 +739,8 @@ class Game:
             draw_heart(self.screen, 28 + i * 26, 30, i < self.player.hearts, scale)
         score = self.font.render(str(self.score), True, TEXT)
         self.screen.blit(score, score.get_rect(midtop=(VIEW_W // 2, 16)))
+        best = self.small.render(f"BEST  {self.high}", True, GOLD)
+        self.screen.blit(best, best.get_rect(midtop=(VIEW_W // 2, 48)))
         wave = self.small.render(f"WAVE {self.wave}", True, MUTED)
         self.screen.blit(wave, (22, 48))
         self.draw_dash_meter()
@@ -758,7 +780,8 @@ class Game:
         self.preview.pos -= shift
         self.preview.draw(self.screen)
         self.preview.pos += shift
-        self.draw_panel()
+        if self.map_open:
+            self.draw_panel()
         title = "MINI SHOOTER"
         x = VIEW_W / 2 - sum(self.big.render(ch, True, TEXT).get_width() for ch in title) / 2
         for i, ch in enumerate(title):
@@ -778,9 +801,10 @@ class Game:
         if self.button("EXIT", (VIEW_W // 2, 458), primary=False):
             self.running = False
         help_1 = self.small.render("WASD move     mouse aim     hold click to shoot     Shift dash", True, TEXT)
-        help_2 = self.small.render("Every 100 points upgrades your gun     M mute     Esc pause", True, MUTED)
+        help_2 = self.small.render("Every 100 points upgrades your gun     Tab map     M mute     Esc pause", True, MUTED)
         self.screen.blit(help_1, help_1.get_rect(midbottom=(VIEW_W // 2, HEIGHT - 58)))
         self.screen.blit(help_2, help_2.get_rect(midbottom=(VIEW_W // 2, HEIGHT - 32)))
+        self.draw_map_toggle()
 
     def draw_map_cards(self):
         card_w, card_h, gap = 250, 78, 16
@@ -809,7 +833,7 @@ class Game:
             self.state = "play"
             self.player.fire_cd = 0.15
         if self.button("TITLE", (VIEW_W // 2, 378), primary=False):
-            self.state = "start"
+            self.show_title()
 
     def draw_over(self):
         self.screen.blit(self.shade, (0, 0))
@@ -817,13 +841,13 @@ class Game:
         self.screen.blit(title, title.get_rect(center=(VIEW_W // 2, 150)))
         score = self.font.render(f"SCORE  {self.score}", True, GOLD)
         self.screen.blit(score, score.get_rect(center=(VIEW_W // 2, 230)))
-        note = "NEW BEST" if self.new_best else f"BEST  {self.high}"
+        note = f"NEW BEST  {self.high}" if self.new_best else f"BEST  {self.high}"
         best = self.small.render(note, True, AMBER if self.new_best else MUTED)
         self.screen.blit(best, best.get_rect(center=(VIEW_W // 2, 272)))
         if self.button("AGAIN", (VIEW_W // 2, 350)):
             self.begin()
         if self.button("TITLE", (VIEW_W // 2, 418), primary=False):
-            self.state = "start"
+            self.show_title()
 
     def button(self, text, center, primary=True):
         rect = pygame.Rect(0, 0, 220, 52)
@@ -839,6 +863,34 @@ class Game:
         label = self.button_font.render(text, True, INK if primary or hot else TEXT)
         self.screen.blit(label, label.get_rect(center=rect.center))
         return hot and self.clicked
+
+    def map_toggle_rect(self):
+        if self.map_open:
+            return pygame.Rect(VIEW_W + PANEL_W - 78, 12, 62, 26)
+        return pygame.Rect(VIEW_W - 80, 72, 62, 26)
+
+    def toggle_map(self):
+        self.map_open = not self.map_open
+        write_map_open(self.map_open)
+        self.apply_window()
+
+    def apply_window(self):
+        width = WIDTH if self.map_open else VIEW_W
+        if self.headless:
+            self.screen = pygame.Surface((width, HEIGHT))
+            return
+        self.screen = pygame.display.set_mode((width, HEIGHT))
+        pygame.mouse.set_visible(False)
+
+    def draw_map_toggle(self):
+        rect = self.map_toggle_rect()
+        hot = rect.collidepoint(pygame.mouse.get_pos())
+        accent = self.theme["accent"]
+        fill = tuple(min(255, c + 36) for c in accent) if hot else (18, 22, 32)
+        pygame.draw.rect(self.screen, fill, rect, border_radius=8)
+        pygame.draw.rect(self.screen, accent, rect, 2, border_radius=8)
+        label = self.small.render("HIDE" if self.map_open else "MAP", True, INK if hot else TEXT)
+        self.screen.blit(label, label.get_rect(center=rect.center))
 
     def draw_panel(self):
         panel = pygame.Rect(VIEW_W, 0, PANEL_W, HEIGHT)

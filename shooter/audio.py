@@ -1,4 +1,4 @@
-"""Short synthesized shots, hits and a quiet pulse loop. No asset files."""
+"""Shots, hits, and a small tune for each map. No asset files."""
 
 import math
 import random
@@ -39,20 +39,86 @@ def _noise(duration, volume, decay, seed):
     return _sound(buf, volume)
 
 
-def _music():
-    seconds = 2.0
-    n = int(RATE * seconds)
-    buf = []
-    for i in range(n):
-        t = i / RATE
-        beat = t % 0.5
-        env = math.exp(-beat * 7.5)
-        s = math.sin(math.tau * 55 * t) * 0.55 * env
-        s += math.sin(math.tau * 110 * t) * 0.18 * env
-        s += math.sin(math.tau * 82.5 * t) * 0.06
-        buf.append(s)
-    sound = _sound(buf, 0.22)
-    return sound
+def _silence(seconds):
+    return [0.0] * int(RATE * seconds)
+
+
+def _add_tone(buf, start, dur, freq, volume, decay, partials=(1.0,)):
+    begin = int(start * RATE)
+    count = int(dur * RATE)
+    scale = sum(abs(p) for p in partials) or 1.0
+    for i in range(count):
+        at = begin + i
+        if at < 0 or at >= len(buf):
+            break
+        u = i / RATE
+        env = min(1.0, i / 8) * math.exp(-decay * u)
+        sample = 0.0
+        for n, amp in enumerate(partials, start=1):
+            sample += math.sin(math.tau * freq * n * u) * amp
+        buf[at] += sample / scale * env * volume
+
+
+def _deduction():
+    """Clear, cool bells. Open floor, nothing in the way."""
+    buf = _silence(4.0)
+    for hit in (0.0, 2.0):
+        _add_tone(buf, hit, 0.7, 110.0, 0.22, 3.2)
+    notes = (
+        (0.00, 880.00),
+        (0.50, 659.25),
+        (1.00, 523.25),
+        (1.50, 659.25),
+        (2.00, 783.99),
+        (2.50, 659.25),
+        (3.00, 587.33),
+        (3.50, 523.25),
+    )
+    for start, freq in notes:
+        _add_tone(buf, start, 0.42, freq, 0.16, 5.5)
+        _add_tone(buf, start, 0.03, 1860.0, 0.035, 40)
+    return _sound(buf, 0.28)
+
+
+def _kiln():
+    """Low pulse and a heated half-step line. Lava underfoot."""
+    buf = _silence(4.0)
+    for step in range(8):
+        _add_tone(buf, step * 0.5, 0.28, 49.0, 0.34, 9.0, (1.0, 0.35))
+    notes = (
+        (0.00, 164.81),
+        (0.50, 174.61),
+        (1.00, 164.81),
+        (1.50, 146.83),
+        (2.00, 123.47),
+        (2.50, 146.83),
+        (3.00, 164.81),
+        (3.50, 174.61),
+    )
+    for start, freq in notes:
+        _add_tone(buf, start, 0.36, freq, 0.2, 6.0, (1.0, 0.22, 0.08))
+    return _sound(buf, 0.3)
+
+
+def _veil():
+    """Slow mist. No beat, just a chord that breathes and joins cleanly."""
+    seconds = 4.0
+    buf = _silence(seconds)
+    # Integer cycles so the loop point does not click.
+    layers = (
+        (220.0, 0.10, 1),
+        (262.0, 0.07, 2),
+        (330.0, 0.06, 1),
+        (392.0, 0.035, 3),
+        (660.0, 0.02, 1),
+    )
+    n = len(buf)
+    for freq, volume, tremolo in layers:
+        for i in range(n):
+            t = i / RATE
+            breath = 0.82 + 0.18 * math.sin(math.tau * tremolo * t / seconds)
+            buf[i] += math.sin(math.tau * freq * t) * volume * breath
+    return _sound(buf, 0.34)
 
 
 def _heal():
@@ -80,10 +146,15 @@ class Audio:
     def __init__(self):
         self.muted = False
         self.ok = False
+        self.bed = None
+        self.held = False
         self.music = None
+        self.beds = {}
         try:
             if pygame.mixer.get_init() is None:
                 pygame.mixer.init(RATE, -16, 1, 512)
+            pygame.mixer.set_reserved(1)
+            self.music = pygame.mixer.Channel(0)
             self.sounds = {
                 "shoot": _blip(920, 0.035, 0.18),
                 "hit": _noise(0.06, 0.28, 28, 2),
@@ -94,12 +165,36 @@ class Audio:
                 "heal": _heal(),
                 "wave": _wave(),
             }
-            self.music = _music()
-            self.music.play(-1)
+            self.builders = {
+                "deduction": _deduction,
+                "kiln": _kiln,
+                "veil": _veil,
+            }
+            self.beds = {}
             self.ok = True
         except pygame.error:
             self.sounds = {}
             self.ok = False
+
+    def set_bed(self, name):
+        if name == self.bed and not self.held:
+            return
+        self.bed = name
+        if not self.ok or self.music is None:
+            return
+        self.music.stop()
+        if not name:
+            self.held = False
+            return
+        sound = self.beds.get(name)
+        if sound is None and name in self.builders:
+            sound = self.builders[name]()
+            self.beds[name] = sound
+        if sound is None or self.muted:
+            self.held = True
+            return
+        self.held = False
+        self.music.play(sound, loops=-1)
 
     def play(self, name):
         if self.muted or not self.ok:
@@ -116,4 +211,9 @@ class Audio:
             pygame.mixer.pause()
         else:
             pygame.mixer.unpause()
+            if self.held and self.music is not None:
+                sound = self.beds.get(self.bed)
+                if sound is not None:
+                    self.music.play(sound, loops=-1)
+                self.held = False
         return self.muted

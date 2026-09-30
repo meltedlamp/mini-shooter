@@ -18,7 +18,7 @@ and grab hearts before the next wave starts.
 - **Aim and shoot**: the gun tracks the cursor, kicks back, and throws a muzzle flash. Bullets leave a short trail.
 - **Three maps**, picked on the title screen. **Deduction** is the open crate floor. **Kiln** has lava pools that burn if you stand in them, and tougher waves. **Veil** has mist that slows your steps, and more shooters. The side panel and buttons take on that map's colors.
 - **Secret bosses** sleep in all four corners of every map. Walk into a corner and one wakes up. Beating it pays a big score and a free weapon upgrade. They do not appear on the map until they wake.
-- **A bigger map**: the arena is larger than the window. The view follows you, and the map on the right shows the whole floor, the crates, the enemies, and your dot moving through it.
+- **A bigger map**: the arena is larger than the window. The view follows you. The side panel shows the whole floor, the crates, the enemies, and your dot moving through it. Press `Tab`, or click **MAP** / **HIDE**, to open and close that panel. Your choice is remembered.
 - **Weapon upgrades**: every 100 points the fight pauses and you pick one boost. Rapid shoots faster, Spread fires a fan, Heavy hits harder, and Pierce lets shots pass through enemies. Each can be taken up to three times.
 - **Dash**: Shift bursts you across the floor and leaves afterimages. You slip through enemy shots while dashing.
 - **Three enemies**: orange grunts that chase, purple shooters that hang back and fire, and big red brutes that telegraph a charge with a line, then rush.
@@ -26,8 +26,8 @@ and grab hearts before the next wave starts.
 - **Hearts**: you start with 5. Brutes drop a heart. Picking one up heals you, or scores 50 points if you are already full.
 - **Waves**: each clear pays a bonus and the next wave brings more enemies. Shooters show up from wave 2, and a brute joins every third wave.
 - **Juice**: dust when you run, sparks and rings when something dies, floating scores, a short freeze on a brute kill, and screen shake.
-- **Best score** is remembered on this computer and shown on the title screen.
-- **Quiet pulse music** and little synthesized shots, hits, and explosions. Press `M` to mute.
+- **Best score** is saved on this computer as soon as you beat it, shown under the score while you play, and kept on the title screen.
+- **A small tune for each map** plays only while you fight. Deduction is a clear high line, Kiln is a low heated pulse, and Veil is a slow chord. The title screen and the game over screen stay quiet. Shots, hits, and explosions are still little synthesized sounds. Press `M` to mute.
 - **No asset files.** The characters, crates, particles, music, and sound effects are all drawn and synthesized in code.
 
 ## Getting started
@@ -52,12 +52,13 @@ python game.py
 | Pick an upgrade | Click a card, or press `1` `2` `3` |
 | Start / play again | Click **Play** or **Again** (or press `Enter` or `Space`) |
 | Pause | `Esc`, then **Resume** or **Title** |
+| Show / hide the map | `Tab`, or click **MAP** / **HIDE** |
 | Mute / unmute | `M` |
 | Quit | Click **Exit** (or press `Esc` on the title screen) |
 
 ## How to play
 
-- The floor is bigger than the screen. Walk and the view follows. Use the map on the right to see enemies coming and where the crates are.
+- The floor is bigger than the screen. Walk and the view follows. Open the map on the side when you want to see enemies coming and where the crates are.
 - Every 100 points, pick a weapon upgrade before the fight continues. The bar on the side shows how close the next one is.
 - Clear every enemy in the wave. A banner announces the next one, and you get a moment to move before they spawn nearby.
 - Grunts walk straight at you. Two shots stop one. Touching an enemy costs a heart.
@@ -95,7 +96,8 @@ mini-shooter/
 │   ├── game.py          # arena loop: waves, collisions, menus, drawing
 │   ├── actors.py        # player, enemies, bullets, hearts, and their animation
 │   ├── fx.py            # sparks, rings, shell casings, floating scores
-│   ├── audio.py         # synthesized shots, hits, and the pulse loop
+│   ├── audio.py         # one tune per map, and the shot sounds
+│   ├── maps.py          # Deduction, Kiln, and Veil
 │   ├── settings.py      # window size, colours, and tuning knobs
 │   └── scores.py        # the best score saved on this computer
 ├── requirements.txt     # pygame dependency
