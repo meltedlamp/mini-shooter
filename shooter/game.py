@@ -16,7 +16,7 @@ from .maps import MAPS
 from .scores import read_high_score, read_map_open, write_high_score, write_map_open
 from .settings import (
     AMBER, CYAN, DASH_COOLDOWN, FIRE_COOLDOWN, FPS, GOLD, HEIGHT, INK, MARGIN, MAX_HEARTS, MUTED,
-    PANEL_W, PLAYER_BULLET_SPEED, TEXT, TITLE, UPGRADE_EVERY, VIEW_H, VIEW_W, WALL, WIDTH, WORLD_H,
+    ARCADE_URL, PANEL_W, PLAYER_BULLET_SPEED, TEXT, TITLE, UPGRADE_EVERY, VIEW_H, VIEW_W, WALL, WIDTH, WORLD_H,
     WORLD_W,
 )
 
@@ -139,7 +139,7 @@ class Game:
             return
         if key == pygame.K_ESCAPE:
             if self.state == "start":
-                self.running = False
+                self.leave()
             elif self.state == "play":
                 self.state = "pause"
             elif self.state == "pause":
@@ -155,6 +155,15 @@ class Game:
         self.apply_map()
         self.state = "play"
         self.audio.set_bed(self.theme["id"])
+
+    def leave(self):
+        """Close the desktop window. In the browser, return to the arcade."""
+        if sys.platform != "emscripten":
+            self.running = False
+            return
+        import platform
+
+        platform.window.location.href = ARCADE_URL
 
     def show_title(self):
         self.remember_score()
@@ -811,7 +820,7 @@ class Game:
         if self.button("PLAY", (VIEW_W // 2, 390)):
             self.begin()
         if self.button("EXIT", (VIEW_W // 2, 458), primary=False):
-            self.running = False
+            self.leave()
         help_1 = self.small.render("WASD move     mouse aim     hold click to shoot     Shift dash", True, TEXT)
         help_2 = self.small.render("Every 100 points upgrades your gun     Tab map     M mute     Esc pause", True, MUTED)
         self.screen.blit(help_1, help_1.get_rect(midbottom=(VIEW_W // 2, HEIGHT - 58)))

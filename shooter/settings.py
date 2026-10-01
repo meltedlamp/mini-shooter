@@ -6,6 +6,8 @@ WIDTH, HEIGHT = VIEW_W + PANEL_W, VIEW_H
 WORLD_W, WORLD_H = 2800, 2000
 FPS = 60
 TITLE = "Mini Shooter"
+# Title-screen Exit in the browser returns here. The desktop app still closes.
+ARCADE_URL = "https://meltedlamp.github.io/melted-arcade/"
 MARGIN = 34
 UPGRADE_EVERY = 100
 
