@@ -1,7 +1,9 @@
 """Arena loop: waves, collisions, menus and the main draw."""
 
+import asyncio
 import math
 import random
+import sys
 
 import pygame
 
@@ -27,12 +29,21 @@ UPGRADES = (
 UPGRADE_BY_KEY = {item[0]: item for item in UPGRADES}
 
 
+def _ui_font(size, bold=False):
+    """Segoe UI on the desktop. The browser build has no system fonts."""
+    if sys.platform == "emscripten":
+        return pygame.font.Font(None, size)
+    return pygame.font.SysFont("segoeui", size, bold=bold)
+
+
 class Game:
     def __init__(self, *, headless=False):
         self.headless = headless
         try:
-            pygame.mixer.pre_init(44100, -16, 1, 512)
-        except pygame.error:
+            pre_init = getattr(pygame.mixer, "pre_init", None)
+            if pre_init is not None:
+                pre_init(44100, -16, 1, 512)
+        except Exception:
             pass
         pygame.init()
         pygame.display.set_caption(TITLE)
@@ -40,10 +51,10 @@ class Game:
         self.apply_window()
         self.world = pygame.Surface((WORLD_W, WORLD_H))
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("segoeui", 28)
-        self.small = pygame.font.SysFont("segoeui", 18)
-        self.big = pygame.font.SysFont("segoeui", 64, bold=True)
-        self.button_font = pygame.font.SysFont("segoeui", 26, bold=True)
+        self.font = _ui_font(28)
+        self.small = _ui_font(18)
+        self.big = _ui_font(64, bold=True)
+        self.button_font = _ui_font(26, bold=True)
         self.audio = Audio()
         self.arena = pygame.Rect(MARGIN, MARGIN, WORLD_W - MARGIN * 2, WORLD_H - MARGIN * 2)
         self.map_index = 0
@@ -96,7 +107,7 @@ class Game:
         self.pending_upgrades = 0
         self.offers = []
 
-    def run(self):
+    async def run(self):
         while self.running:
             dt = min(0.05, self.clock.tick(FPS) / 1000)
             self.clicked = False
@@ -112,6 +123,7 @@ class Game:
             self.offset = self.compute_offset()
             self.update(dt)
             self.draw()
+            await asyncio.sleep(0)
         pygame.quit()
 
     def on_key(self, key):
@@ -1027,5 +1039,5 @@ class Game:
         pygame.draw.circle(self.screen, color, (x, y), 2)
 
 
-def main():
-    Game().run()
+async def main():
+    await Game().run()

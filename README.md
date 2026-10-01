@@ -7,6 +7,12 @@ and grab hearts before the next wave starts.
 
 ![Mini Shooter gameplay](screenshots/fight.png)
 
+## Play in the browser
+
+Open [Mini Shooter](https://yugdogra0.github.io/mini-shooter/) and play. No install and no commands. The first visit downloads the game runtime, then it stays cached. Same controls as below: move with the keyboard, aim with the mouse, hold the button to fire.
+
+After this page is on `main`, turn on GitHub Pages once: **Settings → Pages → Build and deployment → Source: GitHub Actions**. The link above is the game.
+
 ## Screenshots
 
 | Title | Deduction | Game over |
@@ -36,7 +42,7 @@ and grab hearts before the next wave starts.
 
 ## Getting started
 
-You need **Python 3.8+**.
+The browser link above is the way to play without Python. To run it on your computer you need **Python 3.8+**.
 
 ```bash
 git clone https://github.com/yugdogra0/mini-shooter.git
@@ -96,6 +102,7 @@ Wave size is `wave_kinds()` in `shooter/game.py`: wave 1 is three grunts, later 
 ```
 mini-shooter/
 ├── game.py              # launcher: python game.py
+├── main.py              # browser entry, packed for the web page
 ├── shooter/             # the game package (also runs with: python -m shooter)
 │   ├── game.py          # arena loop: waves, collisions, menus, drawing
 │   ├── actors.py        # player, enemies, bullets, hearts, and their animation

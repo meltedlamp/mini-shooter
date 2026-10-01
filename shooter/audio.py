@@ -172,7 +172,7 @@ class Audio:
             }
             self.beds = {}
             self.ok = True
-        except pygame.error:
+        except (AttributeError, pygame.error, ValueError, TypeError, OverflowError):
             self.sounds = {}
             self.ok = False
 
@@ -188,7 +188,11 @@ class Audio:
             return
         sound = self.beds.get(name)
         if sound is None and name in self.builders:
-            sound = self.builders[name]()
+            try:
+                sound = self.builders[name]()
+            except (AttributeError, pygame.error, ValueError, TypeError, OverflowError):
+                self.ok = False
+                return
             self.beds[name] = sound
         if sound is None or self.muted:
             self.held = True
