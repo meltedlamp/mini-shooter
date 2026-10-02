@@ -42,7 +42,10 @@ class Game:
         try:
             pre_init = getattr(pygame.mixer, "pre_init", None)
             if pre_init is not None:
-                pre_init(44100, -16, 1, 512)
+                if sys.platform == "emscripten":
+                    pre_init(44100, -16, 2, 4096)
+                else:
+                    pre_init(44100, -16, 1, 512)
         except Exception:
             pass
         pygame.init()

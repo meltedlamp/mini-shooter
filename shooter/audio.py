@@ -2,6 +2,7 @@
 
 import math
 import random
+import sys
 from array import array
 
 import pygame
@@ -10,8 +11,20 @@ import pygame
 RATE = 44100
 
 
+def _channels():
+    """The browser mixer is stereo even when mono was requested. A mono buffer is then read as left/right pairs, which crackles."""
+    init = pygame.mixer.get_init()
+    if init is None:
+        return 1
+    return init[2] or 1
+
+
 def _sound(samples, volume):
-    buf = array("h", (max(-32767, min(32767, int(s * volume * 32767))) for s in samples))
+    clipped = (max(-32767, min(32767, int(s * volume * 32767))) for s in samples)
+    if _channels() == 2:
+        buf = array("h", (sample for sample in clipped for _ in (0, 1)))
+    else:
+        buf = array("h", clipped)
     return pygame.mixer.Sound(buffer=buf)
 
 
@@ -151,7 +164,12 @@ class Audio:
         self.music = None
         self.beds = {}
         try:
-            if pygame.mixer.get_init() is None:
+            if sys.platform == "emscripten":
+                # A 512-sample buffer underruns in the browser and crackles the whole time the page is open.
+                if pygame.mixer.get_init() is not None:
+                    pygame.mixer.quit()
+                pygame.mixer.init(RATE, -16, 2, 4096)
+            elif pygame.mixer.get_init() is None:
                 pygame.mixer.init(RATE, -16, 1, 512)
             pygame.mixer.set_reserved(1)
             self.music = pygame.mixer.Channel(0)
