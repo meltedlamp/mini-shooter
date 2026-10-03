@@ -13,7 +13,7 @@ from .actors import (
 from .audio import Audio
 from .fx import Floater, Particle, burst, ring
 from .maps import MAPS
-from .scores import read_high_score, read_map_open, write_high_score, write_map_open
+from .scores import note_arcade, read_high_score, read_map_open, write_high_score, write_map_open
 from .settings import (
     AMBER, CYAN, DASH_COOLDOWN, FIRE_COOLDOWN, FPS, GOLD, HEIGHT, INK, MARGIN, MAX_HEARTS, MUTED,
     ARCADE_URL, PANEL_W, PLAYER_BULLET_SPEED, TEXT, TITLE, UPGRADE_EVERY, VIEW_H, VIEW_W, WALL, WIDTH, WORLD_H,
@@ -518,6 +518,7 @@ class Game:
             self.shake = 12
             self.audio.play("boom")
             self.remember_score()
+            note_arcade("shooter", self.score)
         else:
             self.audio.play("hurt")
 
